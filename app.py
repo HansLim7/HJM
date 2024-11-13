@@ -107,9 +107,9 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
         log_data = load_data("RECORDS")
         local_tz = pytz.timezone('Asia/Manila')
         
-        # Create new log entry
+        # Create new log entry with current time
         new_entry = pd.DataFrame({
-            'Date': [datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")],
+            'Date': [datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")],  # 24-hour format with seconds
             'Product': [product],
             'Size': [size],
             'Quantity(Pcs/Meter)': [quantity_pcs],
