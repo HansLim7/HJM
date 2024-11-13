@@ -101,7 +101,7 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
         
         # Create new log entry with only the date
         new_entry = pd.DataFrame({
-            'Date': [datetime.now(local_tz).strftime("%Y-%m-%d")],  # Only the date (no time)
+            'Date': [datetime.now(local_tz).strftime("%Y-%m-%d")],  # Only the date
             'Product': [product],
             'Size': [size],
             'Quantity(Pcs/Meter)': [quantity_pcs],
