@@ -66,31 +66,22 @@ def calculate_total(data):
     # Sort by date to ensure chronological order
     data = data.sort_values('Date')
     
-    # Initialize Total columns
-    data['Total(Pcs/Meter)'] = 0
-    data['Total(Box/Roll)'] = 0
+    # Initialize Total column
+    data['Total'] = 0
     
-    # Calculate total for each product, size, and quantity type combination
-    for (product, size, quantity_type) in data.groupby(['Product', 'Size', 'Action']).groups:
-        mask = (data['Product'] == product) & (data['Size'] == size) & (data['Action'] == quantity_type)
-        running_total = 0
-        for idx in data[mask].index:
-            quantity = data.loc[idx, f'Quantity({quantity_type})']
-            action = data.loc[idx, 'Action']
-            
-            # Update running total based on action
-            if action == 'Add':
-                running_total += quantity
-            else:  # Remove
-                running_total -= quantity
-                
-            if action == 'Add':
-                data.loc[idx, f'Total({quantity_type})'] = running_total
-            else:
-                data.loc[idx, f'Total({quantity_type})'] = -running_total
-    
-    # Convert Total columns to integer
-    data[['Total(Pcs/Meter)', 'Total(Box/Roll)']] = data[['Total(Pcs/Meter)', 'Total(Box/Roll)']].astype(int)
+    # Calculate total based on action
+    for idx in data.index:
+        quantity_pcs = data.loc[idx, 'Quantity(Pcs/Meter)']
+        quantity_box = data.loc[idx, 'Quantity(Box/Roll)']
+        action = data.loc[idx, 'Action']
+        
+        if action == 'Add':
+            data.loc[idx, 'Total'] = quantity_pcs + quantity_box
+        else:  # Remove
+            data.loc[idx, 'Total'] = -(quantity_pcs + quantity_box)
+
+    # Convert Total column to integer
+    data['Total'] = data['Total'].astype(int)
     
     return data
 
@@ -117,8 +108,7 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
             'Quantity(Box/Roll)': [quantity_box],
             'Action': [action],
             'Category': [sheet_name],
-            'Total(Pcs/Meter)': [0],  # Placeholder, will be calculated
-            'Total(Box/Roll)': [0]  # Placeholder, will be calculated
+            'Total': [0]  # Placeholder, will be calculated
         })
         
         # Concatenate new entry with existing log data
