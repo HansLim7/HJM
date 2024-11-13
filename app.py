@@ -32,7 +32,7 @@ def load_data(sheet_name):
         
         # Sheet-specific processing
         if sheet_name == "RECORDS":
-            required_columns = ['Date', 'Product', 'Size', 'Quantity', 'Action', 'Category']
+            required_columns = ['Date', 'Product', 'Size', 'Quantity(Pcs/Meter)', 'Quantity(Box/Roll)', 'Action', 'Category']
             if not all(col in data.columns for col in required_columns):
                 st.error(f"Missing required columns in {sheet_name}. Required: {required_columns}")
                 return pd.DataFrame()
@@ -40,11 +40,12 @@ def load_data(sheet_name):
             # Calculate total
             data = calculate_total(data)
         else:
-            required_columns = ['PRODUCT', 'SPECIFICATION', 'QUANTITY']
+            required_columns = ['PRODUCT', 'SPECIFICATION', 'QUANTITY(PCS/METER)', 'QUANTITY(BOX/ROLL)']
             if not all(col in data.columns for col in required_columns):
                 st.error(f"Missing required columns in {sheet_name}. Required: {required_columns}")
                 return pd.DataFrame()
-            data['QUANTITY'] = pd.to_numeric(data['QUANTITY'], errors='coerce').fillna(0).astype(int)
+            data['QUANTITY(PCS/METER)'] = pd.to_numeric(data['QUANTITY(PCS/METER)'], errors='coerce').fillna(0).astype(int)
+            data['QUANTITY(BOX/ROLL)'] = pd.to_numeric(data['QUANTITY(BOX/ROLL)'], errors='coerce').fillna(0).astype(int)
         
         return data
         
@@ -55,7 +56,7 @@ def load_data(sheet_name):
         return pd.DataFrame()
 
 def calculate_total(data):
-    """Calculate total for each product and size combination."""
+    """Calculate total for each product, size, and quantity type combination."""
     if data.empty:
         return data
     
@@ -65,15 +66,16 @@ def calculate_total(data):
     # Sort by date to ensure chronological order
     data = data.sort_values('Date')
     
-    # Initialize Total column
-    data['Total'] = 0
+    # Initialize Total columns
+    data['Total(Pcs/Meter)'] = 0
+    data['Total(Box/Roll)'] = 0
     
-    # Calculate total for each product and size combination
-    for (product, size) in data.groupby(['Product', 'Size']).groups:
-        mask = (data['Product'] == product) & (data['Size'] == size)
+    # Calculate total for each product, size, and quantity type combination
+    for (product, size, quantity_type) in data.groupby(['Product', 'Size', 'Action']).groups:
+        mask = (data['Product'] == product) & (data['Size'] == size) & (data['Action'] == quantity_type)
         running_total = 0
         for idx in data[mask].index:
-            quantity = data.loc[idx, 'Quantity']
+            quantity = data.loc[idx, f'Quantity({quantity_type})']
             action = data.loc[idx, 'Action']
             
             # Update running total based on action
@@ -82,10 +84,13 @@ def calculate_total(data):
             else:  # Remove
                 running_total -= quantity
                 
-            data.loc[idx, 'Total'] = running_total
+            if action == 'Add':
+                data.loc[idx, f'Total({quantity_type})'] = running_total
+            else:
+                data.loc[idx, f'Total({quantity_type})'] = -running_total
     
-    # Convert Total to integer
-    data['Total'] = data['Total'].astype(int)
+    # Convert Total columns to integer
+    data[['Total(Pcs/Meter)', 'Total(Box/Roll)']] = data[['Total(Pcs/Meter)', 'Total(Box/Roll)']].astype(int)
     
     return data
 
@@ -97,7 +102,7 @@ def refresh():
         time.sleep(1)
         st.rerun()
 
-def log_inventory_change(product, size, quantity, action, sheet_name):
+def log_inventory_change(product, size, quantity_pcs, quantity_box, action, sheet_name):
     try:
         # Load existing log data
         log_data = load_data("RECORDS")
@@ -108,10 +113,12 @@ def log_inventory_change(product, size, quantity, action, sheet_name):
             'Date': [datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")],
             'Product': [product],
             'Size': [size],
-            'Quantity': [quantity],
+            'Quantity(Pcs/Meter)': [quantity_pcs],
+            'Quantity(Box/Roll)': [quantity_box],
             'Action': [action],
             'Category': [sheet_name],
-            'Total': [0]  # Placeholder, will be calculated
+            'Total(Pcs/Meter)': [0],  # Placeholder, will be calculated
+            'Total(Box/Roll)': [0]  # Placeholder, will be calculated
         })
         
         # Concatenate new entry with existing log data
@@ -202,43 +209,55 @@ with st.sidebar:
                 key="size_update"
             )
 
-            # Get current quantity
-            current_quantity = existing_data.loc[
+            # Get current quantities
+            current_quantity_pcs = existing_data.loc[
                 (existing_data['PRODUCT'] == selected_product_to_update) & 
                 (existing_data['SPECIFICATION'] == selected_size_to_update), 
-                'QUANTITY'
+                'QUANTITY(PCS/METER)'
+            ].values[0]
+            current_quantity_box = existing_data.loc[
+                (existing_data['PRODUCT'] == selected_product_to_update) & 
+                (existing_data['SPECIFICATION'] == selected_size_to_update), 
+                'QUANTITY(BOX/ROLL)'
             ].values[0]
 
-            st.write(f"Current quantity: {current_quantity}")
+            st.write(f"Current quantity (Pcs/Meter): {current_quantity_pcs}")
+            st.write(f"Current quantity (Box/Roll): {current_quantity_box}")
 
             # Select between Add or Remove
             action = st.radio("Choose action:", ("Add", "Remove"))
 
             # Input for quantity based on selected action
             if action == "Add":
-                quantity = st.number_input("Quantity to Add:", min_value=0, value=0, step=1)
+                quantity_pcs = st.number_input("Quantity (Pcs/Meter) to Add:", min_value=0, value=0, step=1)
+                quantity_box = st.number_input("Quantity (Box/Roll) to Add:", min_value=0, value=0, step=1)
             else:  # Remove
-                quantity = st.number_input("Quantity to Remove:", min_value=0, max_value=current_quantity, value=0, step=1)
+                quantity_pcs = st.number_input("Quantity (Pcs/Meter) to Remove:", min_value=0, max_value=current_quantity_pcs, value=0, step=1)
+                quantity_box = st.number_input("Quantity (Box/Roll) to Remove:", min_value=0, max_value=current_quantity_box, value=0, step=1)
 
             # Button to perform the selected action
             if st.button("Update Inventory"):
-                if quantity > 0:
+                if quantity_pcs > 0 or quantity_box > 0:
                     if action == "Add":
-                        new_quantity = current_quantity + quantity
-                        success_message = f"Added {quantity} to {selected_product_to_update} (Size: {selected_size_to_update}). New quantity: {new_quantity}"
+                        new_quantity_pcs = current_quantity_pcs + quantity_pcs
+                        new_quantity_box = current_quantity_box + quantity_box
+                        success_message = f"Added {quantity_pcs} (Pcs/Meter) and {quantity_box} (Box/Roll) to {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs} (Pcs/Meter), {new_quantity_box} (Box/Roll)"
                     else:  # Remove
-                        new_quantity = current_quantity - quantity
-                        success_message = f"Removed {quantity} from {selected_product_to_update} (Size: {selected_size_to_update}). New quantity: {new_quantity}"
+                        new_quantity_pcs = current_quantity_pcs - quantity_pcs
+                        new_quantity_box = current_quantity_box - quantity_box
+                        success_message = f"Removed {quantity_pcs} (Pcs/Meter) and {quantity_box} (Box/Roll) from {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs} (Pcs/Meter), {new_quantity_box} (Box/Roll)"
 
                     mask = (existing_data['PRODUCT'] == selected_product_to_update) & (existing_data['SPECIFICATION'] == selected_size_to_update)
-                    existing_data.loc[mask, 'QUANTITY'] = new_quantity
+                    existing_data.loc[mask, 'QUANTITY(PCS/METER)'] = new_quantity_pcs
+                    existing_data.loc[mask, 'QUANTITY(BOX/ROLL)'] = new_quantity_box
                     conn.update(worksheet=st.session_state.selected_sheet, data=existing_data)
                     
                     # Log the inventory change
                     log_inventory_change(
                         selected_product_to_update,
                         selected_size_to_update,
-                        quantity,
+                        quantity_pcs,
+                        quantity_box,
                         action,
                         st.session_state.selected_sheet
                     )
@@ -283,17 +302,18 @@ if st.session_state.view_log:
         # Display summary statistics
         if selected_product != 'All':
             st.subheader("Current Stock Level")
-            # Get the latest total for each size of the selected product
+            # Get the latest total for each size and quantity type of the selected product
             latest_totals = (filtered_log[filtered_log['Product'] == selected_product]
                            .sort_values('Date')
-                           .groupby('Size')['Total']
+                           .groupby(['Size', 'Action'])['Total(Pcs/Meter)', 'Total(Box/Roll)']
                            .last()
                            .reset_index())
             
             # Create a clean summary table
             summary_df = pd.DataFrame({
                 'Size': latest_totals['Size'],
-                'Current Stock': latest_totals['Total']
+                'Quantity (Pcs/Meter)': latest_totals['Total(Pcs/Meter)'],
+                'Quantity (Box/Roll)': latest_totals['Total(Box/Roll)']
             })
             
             st.dataframe(summary_df, use_container_width=True, hide_index=True)
