@@ -99,9 +99,9 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
         log_data = load_data("RECORDS")
         local_tz = pytz.timezone('Asia/Manila')
         
-        # Create new log entry
+        # Create new log entry with only the date
         new_entry = pd.DataFrame({
-            'Date': [datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")],
+            'Date': [datetime.now(local_tz).strftime("%Y-%m-%d")],  # Only the date (no time)
             'Product': [product],
             'Size': [size],
             'Quantity(Pcs/Meter)': [quantity_pcs],
@@ -121,7 +121,7 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
         conn.update(worksheet="RECORDS", data=updated_log_data)
     except Exception as e:
         st.error(f"Error logging inventory change: {e}")
-
+        
 # Initialize session state
 if 'view_log' not in st.session_state:
     st.session_state.view_log = False
