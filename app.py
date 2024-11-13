@@ -61,7 +61,7 @@ def calculate_total(data):
         return data
     
     # Convert the Date column to datetime for proper sorting
-    data['Date'] = pd.to_datetime(data['Date'])
+    data['Date'] = pd.to_datetime(data['Date'], errors='coerce')
     
     # Sort by date to ensure chronological order
     data = data.sort_values('Date')
@@ -69,19 +69,27 @@ def calculate_total(data):
     # Initialize Total column
     data['Total'] = 0
     
+    # Fill NaN values with 0 for Quantity columns
+    data['Quantity(Pcs/Meter)'] = data['Quantity(Pcs/Meter)'].fillna(0)
+    data['Quantity(Box/Roll)'] = data['Quantity(Box/Roll)'].fillna(0)
+
     # Calculate total based on action
     for idx in data.index:
         quantity_pcs = data.loc[idx, 'Quantity(Pcs/Meter)']
         quantity_box = data.loc[idx, 'Quantity(Box/Roll)']
         action = data.loc[idx, 'Action']
         
+        # Ensure quantities are numeric
+        quantity_pcs = pd.to_numeric(quantity_pcs, errors='coerce') or 0
+        quantity_box = pd.to_numeric(quantity_box, errors='coerce') or 0
+        
         if action == 'Add':
             data.loc[idx, 'Total'] = quantity_pcs + quantity_box
         else:  # Remove
             data.loc[idx, 'Total'] = -(quantity_pcs + quantity_box)
 
-    # Convert Total column to integer
-    data['Total'] = data['Total'].astype(int)
+    # Convert Total column to integer, handling non-finite values
+    data['Total'] = data['Total'].fillna(0).astype(int)
     
     return data
 
