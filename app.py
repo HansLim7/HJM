@@ -98,9 +98,9 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
         # Load existing log data
         log_data = load_data("RECORDS")
         
-        # Create new log entry with date and time in 12-hour format
+        # Create new log entry with only the date
         new_entry = pd.DataFrame({
-            'Date': [datetime.now().strftime("%Y-%m-%d")],  # Date and time in 12-hour format
+            'Date': [datetime.now().strftime("%Y-%m-%d")],  # Date in YYYY-MM-DD format
             'Product': [product],
             'Size': [size],
             'Quantity(Pcs/Meter)': [quantity_pcs],
@@ -109,6 +109,9 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
             'Category': [sheet_name],
             'Total': [0]  # Placeholder, will be calculated
         })
+        
+        # Explicitly convert the 'Date' column to date type to remove any time component
+        new_entry['Date'] = pd.to_datetime(new_entry['Date']).dt.date
         
         # Concatenate new entry with existing log data
         updated_log_data = pd.concat([log_data, new_entry], ignore_index=True)
