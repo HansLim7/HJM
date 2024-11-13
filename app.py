@@ -100,7 +100,7 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
         
         # Create new log entry with date and time in 12-hour format
         new_entry = pd.DataFrame({
-            'Date': [datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")],  # Date and time in 12-hour format
+            'Date': [datetime.now().strftime("%Y-%m-%d")],  # Date and time in 12-hour format
             'Product': [product],
             'Size': [size],
             'Quantity(Pcs/Meter)': [quantity_pcs],
