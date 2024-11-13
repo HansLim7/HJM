@@ -61,13 +61,14 @@ def calculate_total(data):
         return data
     
     # Convert the Date column to datetime for proper sorting
-    data['Date'] = pd.to_datetime(data['Date'])
+    data['Date'] = pd.to_datetime(data['Date']).dt.date
     
     # Sort by date to ensure chronological order
     data = data.sort_values('Date')
     
     # Initialize Total column
-    data['Total'] = 0
+    data['Total(Pcs/Meter)'] = 0
+    data['Total(Box/Roll)'] = 0
     
     # Calculate total based on action
     for idx in data.index:
@@ -76,12 +77,15 @@ def calculate_total(data):
         action = data.loc[idx, 'Action']
         
         if action == 'Add':
-            data.loc[idx, 'Total'] = quantity_pcs + quantity_box
+            data.loc[idx, 'Total(Pcs/Meter)'] = quantity_pcs
+            data.loc[idx, 'Total(Box/Roll)'] = quantity_box
         else:  # Remove
-            data.loc[idx, 'Total'] = -(quantity_pcs + quantity_box)
+            data.loc[idx, 'Total(Pcs/Meter)'] = -quantity_pcs
+            data.loc[idx, 'Total(Box/Roll)'] = -quantity_box
 
-    # Convert Total column to integer
-    data['Total'] = data['Total'].astype(int)
+    # Convert Total columns to integer
+    data['Total(Pcs/Meter)'] = data['Total(Pcs/Meter)'].astype(int)
+    data['Total(Box/Roll)'] = data['Total(Box/Roll)'].astype(int)
     
     return data
 
@@ -107,11 +111,9 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
             'Quantity(Box/Roll)': [quantity_box],
             'Action': [action],
             'Category': [sheet_name],
-            'Total': [0]  # Placeholder, will be calculated
+            'Total(Pcs/Meter)': [0],  # Placeholder, will be calculated
+            'Total(Box/Roll)': [0]   # Placeholder, will be calculated
         })
-        
-        # Explicitly convert the 'Date' column to date type to remove any time component
-        new_entry['Date'] = pd.to_datetime(new_entry['Date']).dt.date
         
         # Concatenate new entry with existing log data
         updated_log_data = pd.concat([log_data, new_entry], ignore_index=True)
