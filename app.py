@@ -32,8 +32,7 @@ def load_data(sheet_name):
         
         # Sheet-specific processing
         if sheet_name == "RECORDS":
-            required_columns = ['Date', 'Product', 'Size', 'Quantity(Pcs/Meter)', 
-                                'Quantity(Box/Roll)', 'Action', 'Category', 'Total']
+            required_columns = ['Date', 'Product', 'Size', 'Quantity(Pcs/Meter)', 'Quantity(Box/Roll)', 'Action', 'Category']
             if not all(col in data.columns for col in required_columns):
                 st.error(f"Missing required columns in {sheet_name}. Required: {required_columns}")
                 return pd.DataFrame()
@@ -72,29 +71,26 @@ def calculate_total(data):
     data['Total(Box/Roll)'] = 0
     
     # Calculate total for each product, size, and quantity type combination
-    for (product, size, action) in data.groupby(['Product', 'Size', 'Action']).groups:
-        mask = (data['Product'] == product) & (data['Size'] == size) & (data['Action'] == action)
+    for (product, size, quantity_type) in data.groupby(['Product', 'Size', 'Action']).groups:
+        mask = (data['Product'] == product) & (data['Size'] == size) & (data['Action'] == quantity_type)
         running_total = 0
         for idx in data[mask].index:
-            quantity_pcs = data.loc[idx, 'Quantity(Pcs/Meter)']
-            quantity_box = data.loc[idx, 'Quantity(Box/Roll)']
+            quantity = data.loc[idx, f'Quantity({quantity_type})']
             action = data.loc[idx, 'Action']
             
             # Update running total based on action
             if action == 'Add':
-                running_total += quantity_pcs
+                running_total += quantity
             else:  # Remove
-                running_total -= quantity_pcs
+                running_total -= quantity
                 
-            data.loc[idx, 'Total(Pcs/Meter)'] = running_total
-
-            # Similarly update the total for Quantity(Box/Roll)
             if action == 'Add':
-                running_total += quantity_box
+                data.loc[idx, f'Total({quantity_type})'] = running_total
             else:
-                running_total -= quantity_box
-                
-            data.loc[idx, 'Total(Box/Roll)'] = running_total
+                data.loc[idx, f'Total({quantity_type})'] = -running_total
+    
+    # Convert Total columns to integer
+    data[['Total(Pcs/Meter)', 'Total(Box/Roll)']] = data[['Total(Pcs/Meter)', 'Total(Box/Roll)']].astype(int)
     
     return data
 
@@ -144,7 +140,8 @@ if 'selected_sheet' not in st.session_state:
 
 # Sidebar
 with st.sidebar:
-    st.title("Inventory Management")
+    st.title("HJM Sindangan Inventory")
+    st.subheader("Inventory Management")
     
     # Toggle button for view
     if st.button("Toggle View (Inventory Log / Current Inventory)"):
@@ -238,41 +235,98 @@ with st.sidebar:
                 quantity_pcs = st.number_input("Quantity (Pcs/Meter) to Remove:", min_value=0, max_value=current_quantity_pcs, value=0, step=1)
                 quantity_box = st.number_input("Quantity (Box/Roll) to Remove:", min_value=0, max_value=current_quantity_box, value=0, step=1)
 
-            # Add/Remove products button
-            if st.button(f"{action} Products"):
-                try:
+            # Button to perform the selected action
+            if st.button("Update Inventory"):
+                if quantity_pcs > 0 or quantity_box > 0:
                     if action == "Add":
                         new_quantity_pcs = current_quantity_pcs + quantity_pcs
                         new_quantity_box = current_quantity_box + quantity_box
+                        success_message = f"Added {quantity_pcs} (Pcs/Meter) and {quantity_box} (Box/Roll) to {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs} (Pcs/Meter), {new_quantity_box} (Box/Roll)"
                     else:  # Remove
                         new_quantity_pcs = current_quantity_pcs - quantity_pcs
                         new_quantity_box = current_quantity_box - quantity_box
+                        success_message = f"Removed {quantity_pcs} (Pcs/Meter) and {quantity_box} (Box/Roll) from {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs} (Pcs/Meter), {new_quantity_box} (Box/Roll)"
+
+                    mask = (existing_data['PRODUCT'] == selected_product_to_update) & (existing_data['SPECIFICATION'] == selected_size_to_update)
+                    existing_data.loc[mask, 'QUANTITY(PCS/METER)'] = new_quantity_pcs
+                    existing_data.loc[mask, 'QUANTITY(BOX/ROLL)'] = new_quantity_box
+                    conn.update(worksheet=st.session_state.selected_sheet, data=existing_data)
                     
-                    # Update the data in Google Sheets
-                    updated_data = existing_data.copy()
-                    updated_data.loc[
-                        (updated_data['PRODUCT'] == selected_product_to_update) & 
-                        (updated_data['SPECIFICATION'] == selected_size_to_update), 
-                        ['QUANTITY(PCS/METER)', 'QUANTITY(BOX/ROLL)']
-                    ] = [new_quantity_pcs, new_quantity_box]
-                    conn.update(worksheet=st.session_state.selected_sheet, data=updated_data)
-
-                    # Log the change in the records sheet
-                    log_inventory_change(selected_product_to_update, selected_size_to_update, 
-                                         quantity_pcs, quantity_box, action, st.session_state.selected_sheet)
+                    # Log the inventory change
+                    log_inventory_change(
+                        selected_product_to_update,
+                        selected_size_to_update,
+                        quantity_pcs,
+                        quantity_box,
+                        action,
+                        st.session_state.selected_sheet
+                    )
                     
-                    st.success(f"Successfully {action.lower()}ed products.")
-                except Exception as e:
-                    st.error(f"Error updating inventory: {e}")
+                    st.success(success_message)
+                    st.cache_data.clear()
+                    existing_data = load_data(st.session_state.selected_sheet)
+                    filtered_data = existing_data.copy()
+                    refresh()
+                else:
+                    st.warning("Please enter a quantity greater than 0.")
+        else:
+            st.error("No data available in the selected sheet")
 
-        # Display filtered data
-        if not filtered_data.empty:
-            st.subheader("Current Inventory Data")
-            st.dataframe(filtered_data)
-
-# Inventory log view
+# Main area
 if st.session_state.view_log:
-    st.title("Inventory Log")
+    st.title("Inventory Log (RECORDS)")
     log_data = load_data("RECORDS")
+    
     if not log_data.empty:
-        st.dataframe(log_data)
+        # Add filtering options for the log
+        st.sidebar.subheader("Filter Log")
+        
+        # Get unique products and categories
+        products = ['All'] + sorted(log_data['Product'].unique().tolist())
+        categories = ['All'] + sorted(log_data['Category'].unique().tolist())
+        
+        # Filter selections
+        selected_product = st.sidebar.selectbox("Filter by Product:", products)
+        selected_category = st.sidebar.selectbox("Filter by Category:", categories)
+        
+        # Apply filters
+        filtered_log = log_data.copy()
+        if selected_product != 'All':
+            filtered_log = filtered_log[filtered_log['Product'] == selected_product]
+        if selected_category != 'All':
+            filtered_log = filtered_log[filtered_log['Category'] == selected_category]
+        
+        # Display the filtered log
+        st.dataframe(filtered_log, use_container_width=True, hide_index=True)
+        
+        # Display summary statistics
+        if selected_product != 'All':
+            st.subheader("Current Stock Level")
+            # Get the latest total for each size and quantity type of the selected product
+            latest_totals = (filtered_log[filtered_log['Product'] == selected_product]
+                           .sort_values('Date')
+                           .groupby(['Size', 'Action'])['Total(Pcs/Meter)', 'Total(Box/Roll)']
+                           .last()
+                           .reset_index())
+            
+            # Create a clean summary table
+            summary_df = pd.DataFrame({
+                'Size': latest_totals['Size'],
+                'Quantity (Pcs/Meter)': latest_totals['Total(Pcs/Meter)'],
+                'Quantity (Box/Roll)': latest_totals['Total(Box/Roll)']
+            })
+            
+            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("No records available in the log.")
+else:
+    st.title(f"Current Inventory ({st.session_state.selected_sheet})")
+    try:
+        if 'filtered_data' in locals():
+            st.dataframe(filtered_data, use_container_width=True, hide_index=True)
+        else:
+            # If filtered_data is not defined (first load), load the default sheet
+            existing_data = load_data(st.session_state.selected_sheet)
+            st.dataframe(existing_data, use_container_width=True, hide_index=True)
+    except Exception as e:
+        st.error(f"Error displaying data: {e}")
