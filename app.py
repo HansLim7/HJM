@@ -67,25 +67,8 @@ def calculate_total(data):
     data = data.sort_values('Date')
     
     # Initialize Total column
-    data['Total(Pcs/Meter)'] = 0
-    data['Total(Box/Roll)'] = 0
-    
-    # Calculate total based on action
-    for idx in data.index:
-        quantity_pcs = data.loc[idx, 'Quantity(Pcs/Meter)']
-        quantity_box = data.loc[idx, 'Quantity(Box/Roll)']
-        action = data.loc[idx, 'Action']
-        
-        if action == 'Add':
-            data.loc[idx, 'Total(Pcs/Meter)'] = quantity_pcs
-            data.loc[idx, 'Total(Box/Roll)'] = quantity_box
-        else:  # Remove
-            data.loc[idx, 'Total(Pcs/Meter)'] = -quantity_pcs
-            data.loc[idx, 'Total(Box/Roll)'] = -quantity_box
-
-    # Convert Total columns to integer
-    data['Total(Pcs/Meter)'] = data['Total(Pcs/Meter)'].astype(int)
-    data['Total(Box/Roll)'] = data['Total(Box/Roll)'].astype(int)
+    data['Total(Pcs/Meter)'] = data['Quantity(Pcs/Meter)'].cumsum()
+    data['Total(Box/Roll)'] = data['Quantity(Box/Roll)'].cumsum()
     
     return data
 
@@ -110,9 +93,7 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
             'Quantity(Pcs/Meter)': [quantity_pcs],
             'Quantity(Box/Roll)': [quantity_box],
             'Action': [action],
-            'Category': [sheet_name],
-            'Total(Pcs/Meter)': [0],  # Placeholder, will be calculated
-            'Total(Box/Roll)': [0]   # Placeholder, will be calculated
+            'Category': [sheet_name]
         })
         
         # Concatenate new entry with existing log data
@@ -296,10 +277,10 @@ if st.session_state.view_log:
         # Display summary statistics
         if selected_product != 'All':
             st.subheader("Current Stock Level")
-            # Get the latest total for each size and quantity type of the selected product
+            # Get the latest totals for each size and quantity type of the selected product
             latest_totals = (filtered_log[filtered_log['Product'] == selected_product]
                            .sort_values('Date')
-                           .groupby(['Size', 'Action'])['Total(Pcs/Meter)', 'Total(Box/Roll)']
+                           .groupby(['Size'])['Total(Pcs/Meter)', 'Total(Box/Roll)']
                            .last()
                            .reset_index())
             
