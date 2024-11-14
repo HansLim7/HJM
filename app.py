@@ -56,19 +56,45 @@ def load_data(sheet_name):
         return pd.DataFrame()
 
 def calculate_total(data):
-    """Calculate total for each product, size, and quantity type combination."""
+    """Calculate total for each product and size combination."""
     if data.empty:
         return data
     
-    # Convert the Date column to datetime for proper sorting
-    data['Date'] = pd.to_datetime(data['Date']).dt.date
+    # Convert the Date column to datetime with flexible parsing
+    try:
+        # First try parsing with format='mixed' to handle different formats
+        data['Date'] = pd.to_datetime(data['Date'], format='mixed').dt.date
+    except Exception:
+        try:
+            # Fallback to specific format if mixed fails
+            data['Date'] = pd.to_datetime(data['Date'], format='%Y-%m-%d').dt.date
+        except Exception as e:
+            st.error(f"Error processing dates: {str(e)}")
+            return data
     
     # Sort by date to ensure chronological order
     data = data.sort_values('Date')
     
-    # Initialize Total column
-    data['Total(Pcs/Meter)'] = data['Quantity(Pcs/Meter)'].cumsum()
-    data['Total(Box/Roll)'] = data['Quantity(Box/Roll)'].cumsum()
+    # Initialize Total columns with zeros
+    data['Total(Pcs/Meter)'] = 0
+    data['Total(Box/Roll)'] = 0
+    
+    # Group by Product and Size and calculate running totals
+    for (product, size), group in data.groupby(['Product', 'Size']):
+        total_pcs = 0
+        total_box = 0
+        
+        for idx in group.index:
+            if group.loc[idx, 'Action'] == 'Add':
+                total_pcs += group.loc[idx, 'Quantity(Pcs/Meter)']
+                total_box += group.loc[idx, 'Quantity(Box/Roll)']
+            else:  # Remove
+                total_pcs -= group.loc[idx, 'Quantity(Pcs/Meter)']
+                total_box -= group.loc[idx, 'Quantity(Box/Roll)']
+            
+            # Update the totals for this row
+            data.loc[idx, 'Total(Pcs/Meter)'] = total_pcs
+            data.loc[idx, 'Total(Box/Roll)'] = total_box
     
     return data
 
@@ -77,7 +103,7 @@ def refresh():
         st.error("Failed to establish Google Sheets connection.")
     else:
         st.success("Google Sheets connection refreshed successfully.")
-        time.sleep(1)
+        time.sleep(3)
         st.rerun()
 
 def log_inventory_change(product, size, quantity_pcs, quantity_box, action, sheet_name):
@@ -85,9 +111,12 @@ def log_inventory_change(product, size, quantity_pcs, quantity_box, action, shee
         # Load existing log data
         log_data = load_data("RECORDS")
         
-        # Create new log entry with only the date
+        # Format the current date as MM/DD/YYYY to match expected format
+        current_date = datetime.now().strftime("%m/%d/%Y")
+        
+        # Create new log entry
         new_entry = pd.DataFrame({
-            'Date': [datetime.now().strftime("%Y-%m-%d")],  # Date in YYYY-MM-DD format
+            'Date': [current_date],
             'Product': [product],
             'Size': [size],
             'Quantity(Pcs/Meter)': [quantity_pcs],
