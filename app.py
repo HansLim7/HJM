@@ -300,7 +300,31 @@ if st.session_state.view_log:
         if selected_category != 'All':
             filtered_log = filtered_log[filtered_log['Category'] == selected_category]
         
+        # Add download buttons
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            # Download filtered data
+            if not filtered_log.empty:
+                csv_filtered = filtered_log.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Filtered Data",
+                    data=csv_filtered,
+                    file_name=f"inventory_log_filtered_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+        
+        with col2:
+            # Download all data
+            csv_all = log_data.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Complete Log",
+                data=csv_all,
+                file_name=f"inventory_log_complete_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+        
         # Display the filtered log
+        st.subheader("Inventory Log")
         st.dataframe(filtered_log, use_container_width=True, hide_index=True)
         
         # Display summary statistics
@@ -321,16 +345,41 @@ if st.session_state.view_log:
             })
             
             st.dataframe(summary_df, use_container_width=True, hide_index=True)
+            
+            # Add download button for summary
+            csv_summary = summary_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Summary",
+                data=csv_summary,
+                file_name=f"inventory_summary_{selected_product}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
     else:
         st.info("No records available in the log.")
 else:
     st.title(f"Current Inventory ({st.session_state.selected_sheet})")
     try:
         if 'filtered_data' in locals():
+            # Add download button for current inventory view
+            csv_current = filtered_data.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Current Inventory",
+                data=csv_current,
+                file_name=f"current_inventory_{st.session_state.selected_sheet}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
             st.dataframe(filtered_data, use_container_width=True, hide_index=True)
         else:
             # If filtered_data is not defined (first load), load the default sheet
             existing_data = load_data(st.session_state.selected_sheet)
+            # Add download button for default view
+            csv_default = existing_data.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Current Inventory",
+                data=csv_default,
+                file_name=f"current_inventory_{st.session_state.selected_sheet}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
             st.dataframe(existing_data, use_container_width=True, hide_index=True)
     except Exception as e:
         st.error(f"Error displaying data: {e}")
