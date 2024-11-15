@@ -291,43 +291,17 @@ if st.session_state.view_log:
         # Get unique products and categories
         products = ['All'] + sorted(log_data['Product'].unique().tolist())
         categories = ['All'] + sorted(log_data['Category'].unique().tolist())
-
+        
         # Filter selections
         selected_product = st.sidebar.selectbox("Filter by Product:", products)
         selected_category = st.sidebar.selectbox("Filter by Category:", categories)
-
-        # Date range filter
-        st.sidebar.subheader("Filter by Date Range")
-        start_date = st.sidebar.date_input("Start Date", value=None)
-        end_date = st.sidebar.date_input("End Date", value=None)
-
-        # Apply filters
-        filtered_log = log_data.copy()
-        # Convert 'Date' column to datetime if it's not already
-        filtered_log['Date'] = pd.to_datetime(filtered_log['Date'], errors='coerce')
-
-        # Only filter by date if a date range is provided
-        if start_date and end_date:
-            filtered_log = filtered_log[
-        (filtered_log['Date'] >= pd.to_datetime(start_date)) & 
-        (filtered_log['Date'] <= pd.to_datetime(end_date))
-]
-
+        
         # Apply filters
         filtered_log = log_data.copy()
         if selected_product != 'All':
             filtered_log = filtered_log[filtered_log['Product'] == selected_product]
         if selected_category != 'All':
             filtered_log = filtered_log[filtered_log['Category'] == selected_category]
-        
-        # Convert 'Date' column to datetime if it's not already
-        filtered_log['Date'] = pd.to_datetime(filtered_log['Date'], errors='coerce')
-
-        # Filter by date range
-        filtered_log = filtered_log[
-            (filtered_log['Date'] >= pd.to_datetime(start_date)) & 
-            (filtered_log['Date'] <= pd.to_datetime(end_date))
-        ]
         
         # Add download buttons
         col1, col2 = st.columns([1, 3])
@@ -391,7 +365,6 @@ if st.session_state.view_log:
             )
     else:
         st.info("No records available in the log.")
-        
 else:
     st.title(f"Current Inventory ({st.session_state.selected_sheet})")
     try:
