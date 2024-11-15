@@ -147,8 +147,6 @@ if 'selected_sheet' not in st.session_state:
 with st.sidebar:
     st.title("HJM Sindangan Inventory")
     st.subheader("Inventory Management")
-    if st.button("Refresh"):
-        st.rerun()
     
     # Toggle button for view
     if st.button("Toggle View (Inventory Log / Current Inventory)"):
