@@ -338,11 +338,13 @@ if st.session_state.view_log:
         if selected_product != 'All':
             st.subheader("Current Stock Level")
             # Get the latest totals for each size and quantity type of the selected product
-            latest_totals = (filtered_log[filtered_log['Product'] == selected_product]
-                           .sort_values('Date')
-                           .groupby(['Size'])['Total(Pcs/Meter)', 'Total(Box/Roll)']
-                           .last()
-                           .reset_index())
+            latest_totals = (
+                filtered_log[filtered_log['Product'] == selected_product]
+                .sort_values('Date')
+                .groupby(['Size'])[['Total(Pcs/Meter)', 'Total(Box/Roll)']]
+                .last()
+                .reset_index()
+            )
             
             # Create a clean summary table
             summary_df = pd.DataFrame({
