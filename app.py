@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import pytz
+import datetime
 import time
 from streamlit_gsheets import GSheetsConnection
 
