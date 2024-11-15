@@ -298,8 +298,20 @@ if st.session_state.view_log:
 
         # Date range filter
         st.sidebar.subheader("Filter by Date Range")
-        start_date = st.sidebar.date_input("Start Date", value=datetime.now().date())
-        end_date = st.sidebar.date_input("End Date", value=datetime.now().date())
+        start_date = st.sidebar.date_input("Start Date", value=None)
+        end_date = st.sidebar.date_input("End Date", value=None)
+
+        # Apply filters
+        filtered_log = log_data.copy()
+        # Convert 'Date' column to datetime if it's not already
+        filtered_log['Date'] = pd.to_datetime(filtered_log['Date'], errors='coerce')
+
+        # Only filter by date if a date range is provided
+        if start_date and end_date:
+            filtered_log = filtered_log[
+        (filtered_log['Date'] >= pd.to_datetime(start_date)) & 
+        (filtered_log['Date'] <= pd.to_datetime(end_date))
+]
 
         # Apply filters
         filtered_log = log_data.copy()
