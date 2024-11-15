@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import pytz
 import time
 from streamlit_gsheets import GSheetsConnection
 
@@ -295,24 +296,12 @@ if st.session_state.view_log:
         selected_product = st.sidebar.selectbox("Filter by Product:", products)
         selected_category = st.sidebar.selectbox("Filter by Category:", categories)
         
-        # Date range filters
-        st.sidebar.subheader("Filter by Date Range")
-        min_date = log_data['Date'].min() if not log_data['Date'].isna().all() else datetime.date.today()
-        max_date = log_data['Date'].max() if not log_data['Date'].isna().all() else datetime.date.today()
-        start_date = st.sidebar.date_input("Start Date:", min_value=min_date, max_value=max_date, value=min_date)
-        end_date = st.sidebar.date_input("End Date:", min_value=min_date, max_value=max_date, value=max_date)
-        
         # Apply filters
         filtered_log = log_data.copy()
         if selected_product != 'All':
             filtered_log = filtered_log[filtered_log['Product'] == selected_product]
         if selected_category != 'All':
             filtered_log = filtered_log[filtered_log['Category'] == selected_category]
-        
-        # Filter by date range
-        if 'Date' in filtered_log.columns:
-            filtered_log['Date'] = pd.to_datetime(filtered_log['Date']).dt.date  # Ensure Date column is in date format
-            filtered_log = filtered_log[(filtered_log['Date'] >= start_date) & (filtered_log['Date'] <= end_date)]
         
         # Add download buttons
         col1, col2 = st.columns([1, 3])
@@ -323,7 +312,7 @@ if st.session_state.view_log:
                 st.download_button(
                     label="📥 Download Filtered Data",
                     data=csv_filtered,
-                    file_name=f"inventory_log_filtered_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+                    file_name=f"inventory_log_filtered_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
                 )
         
@@ -333,7 +322,7 @@ if st.session_state.view_log:
             st.download_button(
                 label="📥 Download Complete Log",
                 data=csv_all,
-                file_name=f"inventory_log_complete_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"inventory_log_complete_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
             )
         
@@ -345,7 +334,7 @@ if st.session_state.view_log:
         if st.button("🔄 Refresh Data", key="refresh_log"):
             refresh()
         
-        # Display summary statistics (if necessary)
+        # Display summary statistics
         if selected_product != 'All':
             st.subheader("Current Stock Level")
             # Get the latest totals for each size and quantity type of the selected product
@@ -355,7 +344,7 @@ if st.session_state.view_log:
                 .groupby(['Size'])[['Total(Pcs/Meter)', 'Total(Box/Roll)']]
                 .last()
                 .reset_index()
-            )
+                )
             
             # Create a clean summary table
             summary_df = pd.DataFrame({
@@ -371,7 +360,7 @@ if st.session_state.view_log:
             st.download_button(
                 label="📥 Download Summary",
                 data=csv_summary,
-                file_name=f"inventory_summary_{selected_product}_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"inventory_summary_{selected_product}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
             )
     else:
