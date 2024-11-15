@@ -100,12 +100,14 @@ def calculate_total(data):
     return data
 
 def refresh():
+    conn = st.connection("gsheets", type=GSheetsConnection, ttl=5)
     if conn is None:
         st.error("Failed to establish Google Sheets connection.")
     else:
         st.success("Google Sheets connection refreshed successfully.")
         time.sleep(3)
         st.rerun()
+
 
 def log_inventory_change(product, size, quantity_pcs, quantity_box, action, sheet_name):
     try:
