@@ -308,6 +308,9 @@ if st.session_state.view_log:
         if selected_category != 'All':
             filtered_log = filtered_log[filtered_log['Category'] == selected_category]
         
+        # Convert 'Date' column to datetime if it's not already
+        filtered_log['Date'] = pd.to_datetime(filtered_log['Date'], errors='coerce')
+
         # Filter by date range
         filtered_log = filtered_log[
             (filtered_log['Date'] >= pd.to_datetime(start_date)) & 
