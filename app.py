@@ -11,7 +11,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 INVENTORY_SHEETS = [
     "GEN MDSE",
     "SCALES",
-    "BELTS",
+    "V-BELTS",
     "TOOLS",
     "ELECTRICAL",
     "METALS",
