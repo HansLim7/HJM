@@ -12,6 +12,7 @@ INVENTORY_SHEETS = [
     "GEN MDSE",
     "SCALES",
     "V-BELTS",
+    "BRIGGS AND STRATON",
     "TOOLS",
     "ELECTRICAL",
     "METALS",
