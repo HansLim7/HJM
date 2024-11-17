@@ -10,6 +10,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 # List of available inventory sheets
 INVENTORY_SHEETS = [
     "GEN MDSE",
+    "SCALES",
     "BELTS",
     "TOOLS",
     "ELECTRICAL",
