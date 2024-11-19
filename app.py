@@ -9,7 +9,7 @@ import hmac
 st.set_page_config(
     page_title="HJM Sindangan Inventory Manager",
     layout="wide",
-    page_icon="🌄"
+    page_icon="🌄",
 )
 # Security helper functions
 def check_password():
