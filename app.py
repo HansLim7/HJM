@@ -5,6 +5,12 @@ import time
 from streamlit_gsheets import GSheetsConnection
 import hmac
 
+# page config
+st.set_page_config(
+    page_title="HJM Sindangan Inventory Manager",
+    layout="wide",
+    page_icon="🌄"
+)
 # Security helper functions
 def check_password():
     """Returns `True` if the user had the correct password."""
