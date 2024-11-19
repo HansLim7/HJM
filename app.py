@@ -19,6 +19,7 @@ INVENTORY_SHEETS = [
     "HARDWARE",
     "PLUMBING",
     "PAINTS",
+    "PAINT MIXING",
     "TREASURE ISLAND",
     "FISHING"
 ]
