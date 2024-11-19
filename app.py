@@ -19,6 +19,7 @@ def check_password():
 
     # First run or credentials cleared
     if "password_correct" not in st.session_state:
+        st.title("HJM Sindangan Inventory Manager")
         st.text_input("Username:", key="username")
         st.text_input("Password:", type="password", key="password")
         st.button("Login", on_click=password_entered)
@@ -30,6 +31,7 @@ def check_password():
     
     # Password incorrect
     else:
+        st.title("HJM Sindangan Inventory Manager")
         st.text_input("Username:", key="username")
         st.text_input("Password:", type="password", key="password")
         st.button("Login", on_click=password_entered)
