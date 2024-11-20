@@ -88,8 +88,9 @@ def load_data(sheet_name):
             if not all(col in data.columns for col in required_columns):
                 st.error(f"Missing required columns in {sheet_name}. Required: {required_columns}")
                 return pd.DataFrame()
-            data['QUANTITY(PCS/METER)'] = pd.to_numeric(data['QUANTITY(PCS/METER)'], errors='coerce').fillna(0).astype(int)
-            data['QUANTITY(BOX/ROLL)'] = pd.to_numeric(data['QUANTITY(BOX/ROLL)'], errors='coerce').fillna(0).astype(int)
+            # Convert to float instead of int to handle decimals
+            data['QUANTITY(PCS/METER)'] = pd.to_numeric(data['QUANTITY(PCS/METER)'], errors='coerce').fillna(0).astype(float)
+            data['QUANTITY(BOX/ROLL)'] = pd.to_numeric(data['QUANTITY(BOX/ROLL)'], errors='coerce').fillna(0).astype(float)
         
         return data
         
@@ -104,13 +105,11 @@ def calculate_total(data):
     if data.empty:
         return data
     
-    # Convert the Date column to datetime with flexible parsing
     try:
-        # First try parsing with format='mixed' to handle different formats
+        # Convert the Date column to datetime with flexible parsing
         data['Date'] = pd.to_datetime(data['Date'], format='mixed').dt.date
     except Exception:
         try:
-            # Fallback to specific format if mixed fails
             data['Date'] = pd.to_datetime(data['Date'], format='%Y-%m-%d').dt.date
         except Exception as e:
             st.error(f"Error processing dates: {str(e)}")
@@ -119,14 +118,18 @@ def calculate_total(data):
     # Sort by date to ensure chronological order
     data = data.sort_values('Date')
     
-    # Initialize Total columns with zeros
-    data['Total(Pcs/Meter)'] = 0
-    data['Total(Box/Roll)'] = 0
+    # Initialize Total columns with zeros as floats
+    data['Total(Pcs/Meter)'] = 0.0
+    data['Total(Box/Roll)'] = 0.0
+    
+    # Convert quantity columns to float if they're not already
+    data['Quantity(Pcs/Meter)'] = pd.to_numeric(data['Quantity(Pcs/Meter)'], errors='coerce').fillna(0).astype(float)
+    data['Quantity(Box/Roll)'] = pd.to_numeric(data['Quantity(Box/Roll)'], errors='coerce').fillna(0).astype(float)
     
     # Group by Product and Size and calculate running totals
     for (product, size), group in data.groupby(['Product', 'Size']):
-        total_pcs = 0
-        total_box = 0
+        total_pcs = 0.0
+        total_box = 0.0
         
         for idx in group.index:
             if group.loc[idx, 'Action'] == 'Add':
@@ -137,8 +140,8 @@ def calculate_total(data):
                 total_box -= group.loc[idx, 'Quantity(Box/Roll)']
             
             # Update the totals for this row
-            data.loc[idx, 'Total(Pcs/Meter)'] = total_pcs
-            data.loc[idx, 'Total(Box/Roll)'] = total_box
+            data.loc[idx, 'Total(Pcs/Meter)'] = round(total_pcs, 3)
+            data.loc[idx, 'Total(Box/Roll)'] = round(total_box, 3)
     
     return data
 
@@ -271,32 +274,60 @@ def main():
                     'QUANTITY(BOX/ROLL)'
                 ].values[0]
 
-                st.write(f"Current quantity (Pcs/Meter): {current_quantity_pcs}")
-                st.write(f"Current quantity (Box/Roll): {current_quantity_box}")
+                # Display current quantities with 3 decimal places
+                st.write(f"Current quantity (Pcs/Meter): {current_quantity_pcs:.3f}")
+                st.write(f"Current quantity (Box/Roll): {current_quantity_box:.3f}")
 
                 # Select between Add or Remove
                 action = st.radio("Choose action:", ("Add", "Remove"))
 
-                # Input for quantity based on selected action
+                # Modified quantity inputs to accept decimals
                 if action == "Add":
-                    quantity_pcs = st.number_input("Quantity (Pcs/Meter) to Add:", min_value=0, value=0, step=1)
-                    quantity_box = st.number_input("Quantity (Box/Roll) to Add:", min_value=0, value=0, step=1)
+                    quantity_pcs = st.number_input(
+                        "Quantity (Pcs/Meter) to Add:",
+                        min_value=0.0,
+                        value=0.0,
+                        step=0.001,
+                        format="%.3f"
+                    )
+                    quantity_box = st.number_input(
+                        "Quantity (Box/Roll) to Add:",
+                        min_value=0.0,
+                        value=0.0,
+                        step=0.001,
+                        format="%.3f"
+                    )
                 else:  # Remove
-                    quantity_pcs = st.number_input("Quantity (Pcs/Meter) to Remove:", min_value=0, max_value=current_quantity_pcs, value=0, step=1)
-                    quantity_box = st.number_input("Quantity (Box/Roll) to Remove:", min_value=0, max_value=current_quantity_box, value=0, step=1)
+                    quantity_pcs = st.number_input(
+                        "Quantity (Pcs/Meter) to Remove:",
+                        min_value=0.0,
+                        max_value=float(current_quantity_pcs),
+                        value=0.0,
+                        step=0.001,
+                        format="%.3f"
+                    )
+                    quantity_box = st.number_input(
+                        "Quantity (Box/Roll) to Remove:",
+                        min_value=0.0,
+                        max_value=float(current_quantity_box),
+                        value=0.0,
+                        step=0.001,
+                        format="%.3f"
+                    )
 
                 # Button to perform the selected action
                 if st.button("Update Inventory"):
                     if quantity_pcs > 0 or quantity_box > 0:
                         if action == "Add":
-                            new_quantity_pcs = current_quantity_pcs + quantity_pcs
-                            new_quantity_box = current_quantity_box + quantity_box
-                            success_message = f"Added {quantity_pcs} (Pcs/Meter) and {quantity_box} (Box/Roll) to {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs} (Pcs/Meter), {new_quantity_box} (Box/Roll)"
+                            new_quantity_pcs = round(current_quantity_pcs + quantity_pcs, 3)
+                            new_quantity_box = round(current_quantity_box + quantity_box, 3)
+                            success_message = f"Added {quantity_pcs:.3f} (Pcs/Meter) and {quantity_box:.3f} (Box/Roll) to {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs:.3f} (Pcs/Meter), {new_quantity_box:.3f} (Box/Roll)"
                         else:  # Remove
-                            new_quantity_pcs = current_quantity_pcs - quantity_pcs
-                            new_quantity_box = current_quantity_box - quantity_box
-                            success_message = f"Removed {quantity_pcs} (Pcs/Meter) and {quantity_box} (Box/Roll) from {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs} (Pcs/Meter), {new_quantity_box} (Box/Roll)"
+                            new_quantity_pcs = round(current_quantity_pcs - quantity_pcs, 3)
+                            new_quantity_box = round(current_quantity_box - quantity_box, 3)
+                            success_message = f"Removed {quantity_pcs:.3f} (Pcs/Meter) and {quantity_box:.3f} (Box/Roll) from {selected_product_to_update} (Size: {selected_size_to_update}). New quantities: {new_quantity_pcs:.3f} (Pcs/Meter), {new_quantity_box:.3f} (Box/Roll)"
 
+                        # Update the inventory
                         mask = (existing_data['PRODUCT'] == selected_product_to_update) & (existing_data['SPECIFICATION'] == selected_size_to_update)
                         existing_data.loc[mask, 'QUANTITY(PCS/METER)'] = new_quantity_pcs
                         existing_data.loc[mask, 'QUANTITY(BOX/ROLL)'] = new_quantity_box
@@ -319,8 +350,6 @@ def main():
                         refresh()
                     else:
                         st.warning("Please enter a quantity greater than 0.")
-            else:
-                st.error("No data available in the selected sheet")
 
     # Main area
     if st.session_state.view_log:
@@ -349,7 +378,6 @@ def main():
             # Add download buttons
             col1, col2 = st.columns([1, 3])
             with col1:
-                # Download filtered data
                 if not filtered_log.empty:
                     csv_filtered = filtered_log.to_csv(index=False)
                     st.download_button(
@@ -360,7 +388,6 @@ def main():
                     )
             
             with col2:
-                # Download all data
                 csv_all = log_data.to_csv(index=False)
                 st.download_button(
                     label="📥 Download Complete Log",
@@ -369,18 +396,14 @@ def main():
                     mime="text/csv"
                 )
             
-            # Display the filtered log
             st.subheader("Inventory Log")
             st.dataframe(filtered_log, use_container_width=True, hide_index=True)
             
-            # Add refresh button
             if st.button("🔄 Refresh Data", key="refresh_log"):
                 refresh()
             
-            # Display summary statistics
             if selected_product != 'All':
                 st.subheader("Current Stock Level")
-                # Get the latest totals for each size and quantity type of the selected product
                 latest_totals = (
                     filtered_log[filtered_log['Product'] == selected_product]
                     .sort_values('Date')
@@ -389,16 +412,14 @@ def main():
                     .reset_index()
                 )
                 
-                # Create a clean summary table
                 summary_df = pd.DataFrame({
                     'Size': latest_totals['Size'],
-                    'Quantity (Pcs/Meter)': latest_totals['Total(Pcs/Meter)'],
-                    'Quantity (Box/Roll)': latest_totals['Total(Box/Roll)']
+                    'Quantity (Pcs/Meter)': latest_totals['Total(Pcs/Meter)'].round(3),
+                    'Quantity (Box/Roll)': latest_totals['Total(Box/Roll)'].round(3)
                 })
                 
                 st.dataframe(summary_df, use_container_width=True, hide_index=True)
                 
-                # Add download button for summary
                 csv_summary = summary_df.to_csv(index=False)
                 st.download_button(
                     label="📥 Download Summary",
@@ -412,7 +433,6 @@ def main():
         st.title(f"Current Inventory ({st.session_state.selected_sheet})")
         try:
             if 'filtered_data' in locals():
-                # Add download button for current inventory view
                 csv_current = filtered_data.to_csv(index=False)
                 st.download_button(
                     label="📥 Download Current Inventory",
@@ -422,14 +442,10 @@ def main():
                 )
                 st.dataframe(filtered_data, use_container_width=True, hide_index=True)
                 
-                # Add refresh button
                 if st.button("🔄 Refresh Data", key="refresh_inventory"):
                     refresh()
-                    
             else:
-                # If filtered_data is not defined (first load), load the default sheet
                 existing_data = load_data(st.session_state.selected_sheet)
-                # Add download button for default view
                 csv_default = existing_data.to_csv(index=False)
                 st.download_button(
                     label="📥 Download Current Inventory",
@@ -439,7 +455,6 @@ def main():
                 )
                 st.dataframe(existing_data, use_container_width=True, hide_index=True)
                 
-                # Add refresh button
                 if st.button("🔄 Refresh Data", key="refresh_inventory_default"):
                     refresh()
                     
